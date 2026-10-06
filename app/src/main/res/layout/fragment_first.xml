@@ -8,7 +8,8 @@
     android:gravity="center_horizontal"
     android:padding="20dp">
 
-    <!-- TÍTULO DEL JUEGO -->
+    <!-- TÍTULO -->
+
     <TextView
         android:id="@+id/titleText"
         android:layout_width="wrap_content"
@@ -16,9 +17,11 @@
         android:text="@string/game_title"
         android:textSize="28sp"
         android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="10dp" />
 
-    <!-- ESTADO DEL JUEGO -->
+
+    <!-- ESTADO DE LA PARTIDA -->
+
     <TextView
         android:id="@+id/information"
         android:layout_width="match_parent"
@@ -26,31 +29,121 @@
         android:text="@string/turn_human"
         android:textSize="20sp"
         android:gravity="center"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="12dp" />
 
-    <!--
-        TABLERO PERSONALIZADO - RETO 5
 
-        En lugar de utilizar nueve botones,
-        ahora utilizamos la clase BoardView.
+    <!-- ====================================== -->
+    <!-- RETO 6 - MARCADOR -->
+    <!-- ====================================== -->
 
-        BoardView dibuja el tablero directamente
-        utilizando Canvas.
-    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="14dp">
+
+        <!-- HUMAN -->
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Human"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/humanScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+
+        <!-- TIES -->
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ties"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/tieScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+
+        <!-- ANDROID -->
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Android"
+                android:textStyle="bold"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/computerScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+
+    <!-- ====================================== -->
+    <!-- TABLERO PERSONALIZADO -->
+    <!-- ====================================== -->
+
     <co.edu.unal.tictactoe.BoardView
         android:id="@+id/boardView"
         android:layout_width="300dp"
         android:layout_height="300dp"
-        android:layout_gravity="center"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="24dp" />
+        android:layout_gravity="center_horizontal" />
 
-    <!-- BOTÓN PARA INICIAR UNA NUEVA PARTIDA -->
+
+    <!-- NUEVA PARTIDA -->
+
     <Button
         android:id="@+id/restartButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/new_game"
-        android:layout_marginTop="24dp" />
+        android:layout_marginTop="18dp" />
 
 </LinearLayout>

@@ -1,5 +1,6 @@
 package co.edu.unal.tictactoe
 
+import android.content.Context
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -14,15 +15,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import co.edu.unal.tictactoe.databinding.FragmentFirstBinding
 
-/**
- * FirstFragment controla la interfaz del juego.
- *
- * Reto 5:
- * - El tablero utiliza una vista personalizada BoardView.
- * - El tablero, las X y las O se dibujan mediante Canvas.
- * - Se detectan los toques directamente sobre BoardView.
- * - Se reproducen sonidos diferentes para el jugador y Android.
- */
 class FirstFragment : Fragment() {
 
     // ============================================================
@@ -42,26 +34,79 @@ class FirstFragment : Fragment() {
 
     private var gameOver = false
 
-    // Evita que el jugador toque otra casilla
-    // mientras Android está realizando su movimiento.
     private var computerThinking = false
 
 
     // ============================================================
     // 3. SONIDO
     // ============================================================
-// Indica si los efectos de sonido están activados.
-// Por defecto comienzan activados.
+
     private var soundEnabled = true
 
-    // Utilizamos un solo MediaPlayer para evitar
-// que los sonidos se reproduzcan simultáneamente.
     private var mediaPlayer: MediaPlayer? = null
 
 
+    // ============================================================
+    // 4. RETO 6 - PUNTAJES
+    // ============================================================
+
+    private var humanWins = 0
+
+    private var computerWins = 0
+
+    private var ties = 0
+
+    // Evita contabilizar dos veces el mismo resultado
+    // cuando el dispositivo cambia de orientación.
+    private var scoreAlreadyCounted = false
+
 
     // ============================================================
-    // 4. CREACIÓN DE LA INTERFAZ
+    // 5. CONSTANTES
+    // ============================================================
+
+    companion object {
+
+        // -------------------------------
+        // ESTADO DE LA PARTIDA
+        // -------------------------------
+
+        private const val KEY_BOARD = "board_state"
+
+        private const val KEY_CURRENT_PLAYER = "current_player"
+
+        private const val KEY_GAME_OVER = "game_over"
+
+        private const val KEY_COMPUTER_THINKING =
+            "computer_thinking"
+
+        private const val KEY_DIFFICULTY = "difficulty"
+
+        private const val KEY_SOUND_ENABLED = "sound_enabled"
+
+        private const val KEY_SCORE_COUNTED = "score_counted"
+
+
+        // -------------------------------
+        // SHARED PREFERENCES
+        // -------------------------------
+
+        private const val PREFS_NAME =
+            "tic_tac_toe_preferences"
+
+        private const val PREF_HUMAN_WINS =
+            "human_wins"
+
+        private const val PREF_COMPUTER_WINS =
+            "computer_wins"
+
+        private const val PREF_TIES =
+            "ties"
+        private const val PREF_DIFFICULTY = "difficulty_level"
+
+    }
+    // ============================================================
+    // 6. CREACIÓN DE LA INTERFAZ
     // ============================================================
 
     override fun onCreateView(
@@ -81,7 +126,7 @@ class FirstFragment : Fragment() {
 
 
     // ============================================================
-    // 5. CUANDO LA VISTA YA ESTÁ CREADA
+    // 7. CUANDO LA VISTA YA ESTÁ CREADA
     // ============================================================
 
     override fun onViewCreated(
@@ -89,10 +134,25 @@ class FirstFragment : Fragment() {
         savedInstanceState: Bundle?
     ) {
 
-        super.onViewCreated(view, savedInstanceState)
+        super.onViewCreated(
+            view,
+            savedInstanceState
+        )
+
 
         // --------------------------------------------------------
-        // DETECTAR TOQUES SOBRE BOARDVIEW
+        // CARGAR PUNTAJES GUARDADOS
+        // --------------------------------------------------------
+
+        loadScores()
+
+        loadDifficulty()
+
+        displayScores()
+
+
+        // --------------------------------------------------------
+        // TOQUES SOBRE BOARDVIEW
         // --------------------------------------------------------
 
         binding.boardView.onCellClickListener = { position ->
@@ -101,8 +161,20 @@ class FirstFragment : Fragment() {
         }
 
 
-        // Iniciamos la primera partida.
-        startNewGame()
+        // --------------------------------------------------------
+        // NUEVA PARTIDA O RESTAURAR PARTIDA
+        // --------------------------------------------------------
+
+        if (savedInstanceState == null) {
+
+            startNewGame()
+
+        } else {
+
+            restoreGameState(
+                savedInstanceState
+            )
+        }
 
 
         // --------------------------------------------------------
@@ -116,7 +188,7 @@ class FirstFragment : Fragment() {
 
 
         // --------------------------------------------------------
-        // MENÚ DE OPCIONES
+        // MENÚ
         // --------------------------------------------------------
 
         requireActivity().addMenuProvider(
@@ -132,6 +204,27 @@ class FirstFragment : Fragment() {
                         R.menu.options_menu,
                         menu
                     )
+
+
+                    // Restaurar estado visual del sonido.
+
+                    val soundItem =
+                        menu.findItem(
+                            R.id.sound
+                        )
+
+                    soundItem?.isChecked =
+                        soundEnabled
+
+                    soundItem?.title =
+                        if (soundEnabled) {
+
+                            "Sound: ON"
+
+                        } else {
+
+                            "Sound: OFF"
+                        }
                 }
 
 
@@ -139,9 +232,15 @@ class FirstFragment : Fragment() {
                     menuItem: MenuItem
                 ): Boolean {
 
-                    return when (menuItem.itemId) {
+                    return when (
+                        menuItem.itemId
+                    ) {
 
+
+                        // -------------------------------
                         // NEW GAME
+                        // -------------------------------
+
                         R.id.new_game -> {
 
                             startNewGame()
@@ -150,34 +249,50 @@ class FirstFragment : Fragment() {
                         }
 
 
+                        // -------------------------------
                         // DIFFICULTY
+                        // -------------------------------
+
                         R.id.ai_difficulty -> {
 
                             showDifficultyDialog()
 
                             true
                         }
-// SOUND
+
+
+                        // -------------------------------
+                        // SOUND
+                        // -------------------------------
+
                         R.id.sound -> {
 
-                            soundEnabled = !soundEnabled
+                            soundEnabled =
+                                !soundEnabled
 
-                            menuItem.isChecked = soundEnabled
+                            menuItem.isChecked =
+                                soundEnabled
 
                             menuItem.title =
                                 if (soundEnabled) {
+
                                     "Sound: ON"
+
                                 } else {
+
                                     "Sound: OFF"
                                 }
 
                             true
                         }
 
-                        // QUIT
-                        R.id.quit -> {
 
-                            showQuitDialog()
+                        // -------------------------------
+                        // QUIT
+                        // -------------------------------
+                        R.id.reset_scores -> {
+
+                            resetScores()
 
                             true
                         }
@@ -189,87 +304,103 @@ class FirstFragment : Fragment() {
             },
 
             viewLifecycleOwner,
+
             Lifecycle.State.RESUMED
         )
     }
 
 
     // ============================================================
-    // 6. INICIAR UNA NUEVA PARTIDA
+    // 8. NUEVA PARTIDA
     // ============================================================
 
     private fun startNewGame() {
 
-        // Detenemos cualquier sonido anterior.
         stopSound()
 
-        // Reiniciamos la lógica del juego.
         game.resetGame()
 
-        // Limpiamos visualmente el BoardView.
         binding.boardView.clearBoard()
 
         gameOver = false
+
         computerThinking = false
+
+        scoreAlreadyCounted = false
 
         binding.information.setText(
             R.string.first_human
         )
+
+        // Los puntajes NO se reinician.
+        displayScores()
     }
 
 
     // ============================================================
-    // 7. MOVIMIENTO DEL JUGADOR HUMANO
+    // 9. MOVIMIENTO DEL HUMANO
     // ============================================================
 
-    private fun humanMove(position: Int) {
+    private fun humanMove(
+        position: Int
+    ) {
 
-        // Si la partida terminó, no permitimos más jugadas.
         if (gameOver) {
             return
         }
 
-        // Si Android está pensando, tampoco permitimos otra jugada.
+
         if (computerThinking) {
             return
         }
 
-        // Evitamos seleccionar una casilla ya ocupada.
-        if (binding.boardView.getCell(position) != ' ') {
+
+        if (
+            binding.boardView
+                .getCell(position) != ' '
+        ) {
+
             return
         }
 
-        // Intentamos realizar la jugada en la lógica.
-        val validMove = game.makeMove(position)
+
+        val validMove =
+            game.makeMove(
+                position
+            )
+
 
         if (!validMove) {
             return
         }
 
 
-        // Dibujamos la X en BoardView.
+        // Dibujar X.
+
         binding.boardView.setCell(
             position,
             'X'
         )
 
 
-        // --------------------------------------------------------
-        // SONIDO DEL MOVIMIENTO DEL JUGADOR
-        // --------------------------------------------------------
+        // Sonido humano.
 
-        playSound(R.raw.human_move)
-
-
-        // Revisamos si el jugador ganó.
-        val result = game.checkWinner()
+        playSound(
+            R.raw.human_move
+        )
 
 
-        // Si el jugador ganó o hubo empate,
-        // actualizamos inmediatamente el estado.
+        // Comprobar resultado.
+
+        val result =
+            game.checkWinner()
+
+
         if (result != 0) {
 
-            updateGameStatus(result)
+            updateGameStatus(
+                result
+            )
 
             return
         }
@@ -281,77 +412,90 @@ class FirstFragment : Fragment() {
 
         computerThinking = true
 
+
         binding.information.setText(
             R.string.turn_computer
         )
 
 
-        // Pequeña pausa para separar visualmente y acústicamente
-        // la jugada humana de la jugada de Android.
         binding.boardView.postDelayed({
 
-            if (_binding == null || gameOver) {
+            if (
+                _binding == null ||
+                gameOver
+            ) {
+
                 computerThinking = false
+
                 return@postDelayed
             }
 
+
             computerMove()
 
-            val computerResult = game.checkWinner()
+
+            val computerResult =
+                game.checkWinner()
+
 
             computerThinking = false
 
-            updateGameStatus(computerResult)
+
+            updateGameStatus(
+                computerResult
+            )
 
         }, 1000)
     }
 
 
     // ============================================================
-    // 8. MOVIMIENTO DEL COMPUTADOR
+    // 10. MOVIMIENTO DEL COMPUTADOR
     // ============================================================
 
     private fun computerMove() {
 
-        // La lógica selecciona una posición dependiendo
-        // de Easy, Harder o Expert.
-        val position = game.getComputerMove()
+        val position =
+            game.getComputerMove()
 
 
-        // No quedan movimientos.
         if (position == -1) {
             return
         }
 
 
-        // Registramos el movimiento del computador.
-        game.makeMove(position)
+        game.makeMove(
+            position
+        )
 
 
-        // Dibujamos O sobre el Canvas.
         binding.boardView.setCell(
             position,
             'O'
         )
 
 
-        // --------------------------------------------------------
-        // SONIDO DEL MOVIMIENTO DEL COMPUTADOR
-        // --------------------------------------------------------
-
-        playSound(R.raw.computer_move)
+        playSound(
+            R.raw.computer_move
+        )
     }
 
 
     // ============================================================
-    // 9. ACTUALIZAR EL ESTADO DE LA PARTIDA
+    // 11. ACTUALIZAR ESTADO
     // ============================================================
 
-    private fun updateGameStatus(result: Int) {
+    private fun updateGameStatus(
+        result: Int
+    ) {
 
         when (result) {
 
-            // La partida continúa.
+
+            // --------------------------------------------------
+            // PARTIDA CONTINÚA
+            // --------------------------------------------------
+
             0 -> {
 
                 binding.information.setText(
@@ -360,35 +504,83 @@ class FirstFragment : Fragment() {
             }
 
 
-            // Ganó el jugador.
+            // --------------------------------------------------
+            // GANÓ EL HUMANO
+            // --------------------------------------------------
+
             1 -> {
 
                 binding.information.setText(
                     R.string.result_human_wins
                 )
 
+
+                if (!scoreAlreadyCounted) {
+
+                    humanWins++
+
+                    scoreAlreadyCounted = true
+
+                    saveScores()
+
+                    displayScores()
+                }
+
+
                 finishGame()
             }
 
 
-            // Ganó Android.
+            // --------------------------------------------------
+            // GANÓ ANDROID
+            // --------------------------------------------------
+
             2 -> {
 
                 binding.information.setText(
                     R.string.result_computer_wins
                 )
 
+
+                if (!scoreAlreadyCounted) {
+
+                    computerWins++
+
+                    scoreAlreadyCounted = true
+
+                    saveScores()
+
+                    displayScores()
+                }
+
+
                 finishGame()
             }
 
 
-            // Empate.
+            // --------------------------------------------------
+            // EMPATE
+            // --------------------------------------------------
+
             3 -> {
 
                 binding.information.setText(
                     R.string.result_tie
                 )
 
+
+                if (!scoreAlreadyCounted) {
+
+                    ties++
+
+                    scoreAlreadyCounted = true
+
+                    saveScores()
+
+                    displayScores()
+                }
+
+
                 finishGame()
             }
         }
@@ -396,42 +588,551 @@ class FirstFragment : Fragment() {
 
 
     // ============================================================
-    // 10. FINALIZAR PARTIDA
+    // 12. FINALIZAR PARTIDA
     // ============================================================
 
     private fun finishGame() {
 
         gameOver = true
+
         computerThinking = false
     }
 
 
     // ============================================================
-    // 11. SELECCIONAR DIFICULTAD
+    // 13. SHARED PREFERENCES - CARGAR PUNTAJES
+    // ============================================================
+
+    private fun loadScores() {
+
+        val preferences =
+            requireContext()
+                .getSharedPreferences(
+                    PREFS_NAME,
+                    Context.MODE_PRIVATE
+                )
+
+
+        humanWins =
+            preferences.getInt(
+                PREF_HUMAN_WINS,
+                0
+            )
+
+
+        computerWins =
+            preferences.getInt(
+                PREF_COMPUTER_WINS,
+                0
+            )
+
+
+        ties =
+            preferences.getInt(
+                PREF_TIES,
+                0
+            )
+    }
+// ============================================================
+// EXTRA CHALLENGE - GUARDAR DIFICULTAD
+// ============================================================
+
+    private fun saveDifficulty() {
+
+        val preferences =
+            requireContext().getSharedPreferences(
+                PREFS_NAME,
+                Context.MODE_PRIVATE
+            )
+
+        preferences
+            .edit()
+            .putString(
+                PREF_DIFFICULTY,
+                game.getDifficultyLevel().name
+            )
+            .apply()
+    }
+
+
+// ============================================================
+// EXTRA CHALLENGE - CARGAR DIFICULTAD
+// ============================================================
+
+    private fun loadDifficulty() {
+
+        val preferences =
+            requireContext().getSharedPreferences(
+                PREFS_NAME,
+                Context.MODE_PRIVATE
+            )
+
+        val savedDifficulty =
+            preferences.getString(
+                PREF_DIFFICULTY,
+                TicTacToeGame.DifficultyLevel.EXPERT.name
+            )
+
+        val difficulty =
+            try {
+
+                TicTacToeGame.DifficultyLevel.valueOf(
+                    savedDifficulty
+                        ?: TicTacToeGame.DifficultyLevel.EXPERT.name
+                )
+
+            } catch (e: IllegalArgumentException) {
+
+                TicTacToeGame.DifficultyLevel.EXPERT
+            }
+
+        game.setDifficultyLevel(
+            difficulty
+        )
+    }
+
+    // ============================================================
+    // 14. SHARED PREFERENCES - GUARDAR PUNTAJES
+    // ============================================================
+
+    private fun saveScores() {
+
+        val preferences =
+            requireContext()
+                .getSharedPreferences(
+                    PREFS_NAME,
+                    Context.MODE_PRIVATE
+                )
+
+
+        preferences
+            .edit()
+
+            .putInt(
+                PREF_HUMAN_WINS,
+                humanWins
+            )
+
+            .putInt(
+                PREF_COMPUTER_WINS,
+                computerWins
+            )
+
+            .putInt(
+                PREF_TIES,
+                ties
+            )
+
+            .apply()
+    }
+
+
+    // ============================================================
+    // 15. MOSTRAR PUNTAJES
+    // ============================================================
+
+    private fun displayScores() {
+
+        binding.humanScore.text =
+            humanWins.toString()
+
+
+        binding.computerScore.text =
+            computerWins.toString()
+
+
+        binding.tieScore.text =
+            ties.toString()
+    }
+
+
+    // ============================================================
+    // 16. REINICIAR PUNTAJES
+    // ============================================================
+
+    private fun resetScores() {
+
+        humanWins = 0
+
+        computerWins = 0
+
+        ties = 0
+
+
+        saveScores()
+
+        displayScores()
+    }
+
+
+    // ============================================================
+    // 17. GUARDAR ESTADO AL ROTAR
+    // ============================================================
+
+    override fun onSaveInstanceState(
+        outState: Bundle
+    ) {
+
+        super.onSaveInstanceState(
+            outState
+        )
+
+
+        // Tablero.
+
+        outState.putIntArray(
+            KEY_BOARD,
+            game.getBoardState()
+        )
+
+
+        // Turno.
+
+        outState.putInt(
+            KEY_CURRENT_PLAYER,
+            game.getCurrentPlayer()
+        )
+
+
+        // Game Over.
+
+        outState.putBoolean(
+            KEY_GAME_OVER,
+            gameOver
+        )
+
+
+        // Android pensando.
+
+        outState.putBoolean(
+            KEY_COMPUTER_THINKING,
+            computerThinking
+        )
+
+
+        // Dificultad.
+
+        outState.putString(
+            KEY_DIFFICULTY,
+            game.getDifficultyLevel().name
+        )
+
+
+        // Sonido.
+
+        outState.putBoolean(
+            KEY_SOUND_ENABLED,
+            soundEnabled
+        )
+
+
+        // Resultado ya contabilizado.
+
+        outState.putBoolean(
+            KEY_SCORE_COUNTED,
+            scoreAlreadyCounted
+        )
+    }
+
+
+    // ============================================================
+    // 18. RESTAURAR ESTADO
+    // ============================================================
+
+    private fun restoreGameState(
+        savedInstanceState: Bundle
+    ) {
+
+        // --------------------------------------------------------
+        // TABLERO
+        // --------------------------------------------------------
+
+        val savedBoard =
+            savedInstanceState
+                .getIntArray(
+                    KEY_BOARD
+                )
+
+
+        if (savedBoard != null) {
+
+            game.setBoardState(
+                savedBoard
+            )
+
+        } else {
+
+            startNewGame()
+
+            return
+        }
+
+
+        // --------------------------------------------------------
+        // JUGADOR ACTUAL
+        // --------------------------------------------------------
+
+        val savedPlayer =
+            savedInstanceState.getInt(
+                KEY_CURRENT_PLAYER,
+                TicTacToeGame.CROSS
+            )
+
+
+        game.setCurrentPlayer(
+            savedPlayer
+        )
+
+
+        // --------------------------------------------------------
+        // GAME OVER
+        // --------------------------------------------------------
+
+        gameOver =
+            savedInstanceState.getBoolean(
+                KEY_GAME_OVER,
+                false
+            )
+
+
+        // --------------------------------------------------------
+        // SCORE YA CONTABILIZADO
+        // --------------------------------------------------------
+
+        scoreAlreadyCounted =
+            savedInstanceState.getBoolean(
+                KEY_SCORE_COUNTED,
+                false
+            )
+
+
+        // --------------------------------------------------------
+        // SONIDO
+        // --------------------------------------------------------
+
+        soundEnabled =
+            savedInstanceState.getBoolean(
+                KEY_SOUND_ENABLED,
+                true
+            )
+
+
+        // --------------------------------------------------------
+        // DIFICULTAD
+        // --------------------------------------------------------
+
+        val difficultyName =
+            savedInstanceState.getString(
+                KEY_DIFFICULTY,
+                TicTacToeGame
+                    .DifficultyLevel
+                    .EXPERT
+                    .name
+            )
+
+
+        val restoredDifficulty =
+            try {
+
+                TicTacToeGame
+                    .DifficultyLevel
+                    .valueOf(
+                        difficultyName
+                            ?: TicTacToeGame
+                                .DifficultyLevel
+                                .EXPERT
+                                .name
+                    )
+
+            } catch (
+                exception: IllegalArgumentException
+            ) {
+
+                TicTacToeGame
+                    .DifficultyLevel
+                    .EXPERT
+            }
+
+
+        game.setDifficultyLevel(
+            restoredDifficulty
+        )
+
+
+        // --------------------------------------------------------
+        // REDIBUJAR TABLERO
+        // --------------------------------------------------------
+
+        binding.boardView.clearBoard()
+
+
+        for (i in 0..8) {
+
+            when (
+                game.getCell(i)
+            ) {
+
+
+                TicTacToeGame.CROSS -> {
+
+                    binding.boardView.setCell(
+                        i,
+                        'X'
+                    )
+                }
+
+
+                TicTacToeGame.NOUGHT -> {
+
+                    binding.boardView.setCell(
+                        i,
+                        'O'
+                    )
+                }
+            }
+        }
+
+
+        // Mostrar marcador persistente.
+
+        displayScores()
+
+
+        // --------------------------------------------------------
+        // COMPROBAR SI LA PARTIDA YA TERMINÓ
+        // --------------------------------------------------------
+
+        val result =
+            game.checkWinner()
+
+
+        if (result != 0) {
+
+            updateGameStatus(
+                result
+            )
+
+            return
+        }
+
+
+        // --------------------------------------------------------
+        // RESTAURAR TURNO
+        // --------------------------------------------------------
+
+        computerThinking = false
+
+
+        if (
+            game.getCurrentPlayer() ==
+            TicTacToeGame.NOUGHT
+        ) {
+
+            // Era turno de Android.
+
+            computerThinking = true
+
+
+            binding.information.setText(
+                R.string.turn_computer
+            )
+
+
+            binding.boardView.postDelayed({
+
+                if (
+                    _binding == null ||
+                    gameOver
+                ) {
+
+                    computerThinking = false
+
+                    return@postDelayed
+                }
+
+
+                if (
+                    game.getCurrentPlayer() ==
+                    TicTacToeGame.NOUGHT
+                ) {
+
+                    computerMove()
+
+
+                    val computerResult =
+                        game.checkWinner()
+
+
+                    computerThinking = false
+
+
+                    updateGameStatus(
+                        computerResult
+                    )
+
+                } else {
+
+                    computerThinking = false
+                }
+
+            }, 500)
+
+        } else {
+
+            // Era turno del humano.
+
+            computerThinking = false
+
+
+            binding.information.setText(
+                R.string.turn_human
+            )
+        }
+    }
+
+
+    // ============================================================
+    // 19. DIFICULTAD
     // ============================================================
 
     private fun showDifficultyDialog() {
 
-        val levels = arrayOf(
-            "Easy",
-            "Harder",
-            "Expert"
+        val levels =
+            arrayOf(
+                "Easy",
+                "Harder",
+                "Expert"
+            )
+
+
+        val selected =
+            when (
+                game.getDifficultyLevel()
+            ) {
+
+                TicTacToeGame
+                    .DifficultyLevel
+                    .EASY -> 0
+
+
+                TicTacToeGame
+                    .DifficultyLevel
+                    .HARDER -> 1
+
+
+                TicTacToeGame
+                    .DifficultyLevel
+                    .EXPERT -> 2
+            }
+
+
+        AlertDialog.Builder(
+            requireContext()
         )
 
-
-        val selected = when (game.getDifficultyLevel()) {
-
-            TicTacToeGame.DifficultyLevel.EASY -> 0
-
-            TicTacToeGame.DifficultyLevel.HARDER -> 1
-
-            TicTacToeGame.DifficultyLevel.EXPERT -> 2
-        }
-
-
-        AlertDialog.Builder(requireContext())
-
-            .setTitle("Choose difficulty")
+            .setTitle(
+                "Choose difficulty"
+            )
 
             .setSingleChoiceItems(
                 levels,
@@ -441,19 +1142,34 @@ class FirstFragment : Fragment() {
 
                 when (which) {
 
-                    0 -> game.setDifficultyLevel(
-                        TicTacToeGame.DifficultyLevel.EASY
-                    )
+                    0 ->
 
-                    1 -> game.setDifficultyLevel(
-                        TicTacToeGame.DifficultyLevel.HARDER
-                    )
+                        game.setDifficultyLevel(
+                            TicTacToeGame
+                                .DifficultyLevel
+                                .EASY
+                        )
 
-                    2 -> game.setDifficultyLevel(
-                        TicTacToeGame.DifficultyLevel.EXPERT
-                    )
+
+                    1 ->
+
+                        game.setDifficultyLevel(
+                            TicTacToeGame
+                                .DifficultyLevel
+                                .HARDER
+                        )
+
+
+                    2 ->
+
+                        game.setDifficultyLevel(
+                            TicTacToeGame
+                                .DifficultyLevel
+                                .EXPERT
+                        )
                 }
 
+                saveDifficulty()
 
                 dialog.dismiss()
             }
@@ -462,107 +1178,78 @@ class FirstFragment : Fragment() {
     }
 
 
-    // ============================================================
-    // 12. CONFIRMAR SALIDA
-    // ============================================================
 
-    private fun showQuitDialog() {
-
-        AlertDialog.Builder(requireContext())
-
-            .setTitle("Quit")
-
-            .setMessage(
-                "Are you sure you want to quit?"
-            )
-
-            .setPositiveButton("Yes") { _, _ ->
-
-                requireActivity().finish()
-            }
-
-            .setNegativeButton(
-                "No",
-                null
-            )
-
-            .show()
-    }
 
 
     // ============================================================
-    // 13. REPRODUCIR EFECTOS DE SONIDO
+    // 21. SONIDO
     // ============================================================
 
-    /**
-     * Reproduce un efecto de sonido almacenado en res/raw.
-     *
-     * Antes de reproducir un sonido nuevo se libera el anterior.
-     * De esta manera evitamos que los efectos se superpongan.
-     */
-    private fun playSound(soundResource: Int) {
+    private fun playSound(
+        soundResource: Int
+    ) {
 
-        // Si el usuario desactivó el sonido,
-        // no reproducimos ningún efecto.
         if (!soundEnabled) {
             return
         }
 
-        // Detenemos y liberamos cualquier sonido anterior.
+
         stopSound()
 
-        // Creamos el nuevo efecto de sonido.
-        mediaPlayer = MediaPlayer.create(
-            requireContext(),
-            soundResource
-        )
 
-        // Cuando termina el sonido liberamos MediaPlayer.
-        mediaPlayer?.setOnCompletionListener {
+        mediaPlayer =
+            MediaPlayer.create(
+                requireContext(),
+                soundResource
+            )
 
-            it.release()
 
-            mediaPlayer = null
-        }
+        mediaPlayer
+            ?.setOnCompletionListener {
 
-        // Reproducimos el sonido.
+                it.release()
+
+                mediaPlayer = null
+            }
+
+
         mediaPlayer?.start()
     }
 
 
-    /**
-     * Detiene y libera el sonido que se esté reproduciendo.
-     */
+    // ============================================================
+    // 22. DETENER SONIDO
+    // ============================================================
+
     private fun stopSound() {
 
         mediaPlayer?.let {
 
             if (it.isPlaying) {
+
                 it.stop()
             }
 
+
             it.release()
         }
+
 
         mediaPlayer = null
     }
 
 
     // ============================================================
-    // 14. LIBERAR RECURSOS
+    // 23. LIBERAR RECURSOS
     // ============================================================
 
     override fun onDestroyView() {
 
-        // Detenemos cualquier sonido activo.
         stopSound()
 
-        // Cancelamos movimientos pendientes de Android.
-        if (_binding != null) {
-            binding.boardView.removeCallbacks(null)
-        }
 
         super.onDestroyView()
+
 
         _binding = null
     }

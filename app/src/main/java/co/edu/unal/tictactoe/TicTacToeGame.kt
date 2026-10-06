@@ -43,19 +43,26 @@ class TicTacToeGame {
 
     fun makeMove(position: Int): Boolean {
 
+        // Verificamos que la posición sea válida.
         if (position !in 0..8) {
             return false
         }
 
+        // Verificamos que la casilla esté libre.
         if (board[position] != EMPTY) {
             return false
         }
 
+        // Colocamos la ficha del jugador actual.
         board[position] = currentPlayer
 
+        // Cambiamos de jugador.
         currentPlayer =
-            if (currentPlayer == CROSS) NOUGHT
-            else CROSS
+            if (currentPlayer == CROSS) {
+                NOUGHT
+            } else {
+                CROSS
+            }
 
         return true
     }
@@ -81,24 +88,30 @@ class TicTacToeGame {
     // COMPROBAR GANADOR
     // --------------------------------------------------
 
-    // Devuelve:
-    // 0 = partida continúa
-    // 1 = ganó X
-    // 2 = ganó O
-    // 3 = empate
+    /*
+     * Devuelve:
+     *
+     * 0 = la partida continúa
+     * 1 = ganó X
+     * 2 = ganó O
+     * 3 = empate
+     */
 
     fun checkWinner(): Int {
 
         val winningLines = arrayOf(
 
+            // Filas
             intArrayOf(0, 1, 2),
             intArrayOf(3, 4, 5),
             intArrayOf(6, 7, 8),
 
+            // Columnas
             intArrayOf(0, 3, 6),
             intArrayOf(1, 4, 7),
             intArrayOf(2, 5, 8),
 
+            // Diagonales
             intArrayOf(0, 4, 8),
             intArrayOf(2, 4, 6)
         )
@@ -123,10 +136,14 @@ class TicTacToeGame {
             }
         }
 
+        // Si todavía existen casillas vacías,
+        // la partida continúa.
         if (board.any { it == EMPTY }) {
             return 0
         }
 
+        // Si no hay ganador ni casillas vacías,
+        // entonces hay empate.
         return 3
     }
 
@@ -138,15 +155,21 @@ class TicTacToeGame {
 
         return when (difficultyLevel) {
 
-            // EASY:
+            // --------------------------------------------------
+            // EASY
+            // --------------------------------------------------
             // El computador siempre juega al azar.
+
             DifficultyLevel.EASY -> {
                 getRandomMove()
             }
 
-            // HARDER:
+            // --------------------------------------------------
+            // HARDER
+            // --------------------------------------------------
             // Intenta ganar.
-            // Si no puede, juega al azar.
+            // Si no puede ganar, juega al azar.
+
             DifficultyLevel.HARDER -> {
 
                 val winningMove = getWinningMove()
@@ -158,16 +181,21 @@ class TicTacToeGame {
                 }
             }
 
-            // EXPERT:
-            // Intenta ganar.
-            // Si no puede, bloquea al humano.
-            // Si tampoco necesita bloquear, juega al azar.
+            // --------------------------------------------------
+            // EXPERT
+            // --------------------------------------------------
+            // 1. Intenta ganar.
+            // 2. Si no puede, bloquea al humano.
+            // 3. Si tampoco necesita bloquear, juega al azar.
+
             DifficultyLevel.EXPERT -> {
 
                 val winningMove = getWinningMove()
 
                 if (winningMove != -1) {
+
                     winningMove
+
                 } else {
 
                     val blockingMove = getBlockingMove()
@@ -192,17 +220,19 @@ class TicTacToeGame {
 
             if (board[i] == EMPTY) {
 
-                // Simulamos una jugada de O.
+                // Simulamos una jugada del computador (O).
                 board[i] = NOUGHT
 
+                // Comprobamos si esa jugada produce victoria.
                 if (checkWinner() == 2) {
 
-                    // Restauramos el tablero.
+                    // Restauramos el tablero antes de retornar.
                     board[i] = EMPTY
 
                     return i
                 }
 
+                // Restauramos la casilla.
                 board[i] = EMPTY
             }
         }
@@ -220,9 +250,11 @@ class TicTacToeGame {
 
             if (board[i] == EMPTY) {
 
-                // Simulamos una jugada de X.
+                // Simulamos una jugada del humano (X).
                 board[i] = CROSS
 
+                // Si X ganaría en esta posición,
+                // el computador debe bloquearla.
                 if (checkWinner() == 1) {
 
                     // Restauramos el tablero.
@@ -231,6 +263,7 @@ class TicTacToeGame {
                     return i
                 }
 
+                // Restauramos la casilla.
                 board[i] = EMPTY
             }
         }
@@ -252,6 +285,52 @@ class TicTacToeGame {
             availableMoves.random()
         } else {
             -1
+        }
+    }
+
+    // ==================================================
+    // RETO 6
+    // GUARDAR Y RESTAURAR EL ESTADO DEL JUEGO
+    // ==================================================
+
+    /**
+     * Devuelve una copia del tablero actual.
+     *
+     * Esto permite guardar la posición de las fichas
+     * antes de que Android destruya la interfaz al
+     * cambiar la orientación del dispositivo.
+     */
+    fun getBoardState(): IntArray {
+        return board.clone()
+    }
+
+    /**
+     * Restaura el tablero previamente guardado.
+     *
+     * Se verifica primero que el arreglo recibido
+     * tenga exactamente 9 posiciones.
+     */
+    fun setBoardState(savedBoard: IntArray) {
+
+        if (savedBoard.size == board.size) {
+
+            for (i in board.indices) {
+                board[i] = savedBoard[i]
+            }
+        }
+    }
+
+    /**
+     * Restaura el jugador que tenía el turno
+     * antes del cambio de orientación.
+     *
+     * Esto evita que el computador pueda jugar
+     * dos veces después de girar el dispositivo.
+     */
+    fun setCurrentPlayer(player: Int) {
+
+        if (player == CROSS || player == NOUGHT) {
+            currentPlayer = player
         }
     }
 }
